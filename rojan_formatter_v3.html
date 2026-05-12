@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ROJAN — Resume Engine</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Exo+2:wght@100;300;400;700;900&family=JetBrains+Mono:wght@100;300;400&display=swap');
+:root{--bg:#04070f;--bg2:#060c18;--panel:#080e1a;--panel2:#0a1220;--cyan:#00d4ff;--cyan2:#0090bb;--cyan3:#00d4ff22;--cyan4:#00d4ff08;--orange:#ff6b2b;--gold:#ffd166;--white:#e8f4ff;--dim:#4a6080;--dimmer:#2a3850;--border:#0d2040;--border2:#1a3560;--green:#00ff88;--red:#ff4466;--glow-c:0 0 20px #00d4ff44,0 0 40px #00d4ff22;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Exo 2',sans-serif;background:var(--bg);color:var(--white);min-height:100vh;overflow-x:hidden;}
+.bg-layer{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+.bg-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(0,212,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.03) 1px,transparent 1px);background-size:60px 60px;animation:gridDrift 30s linear infinite;}
+@keyframes gridDrift{to{background-position:60px 60px;}}
+.bg-orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:0.10;animation:orbFloat 20s ease-in-out infinite alternate;}
+.orb1{width:500px;height:500px;background:#00d4ff;top:-150px;right:-100px;animation-duration:18s;}
+.orb2{width:350px;height:350px;background:#ff6b2b;bottom:-100px;left:-80px;animation-duration:24s;animation-delay:-8s;}
+.orb3{width:250px;height:250px;background:#7b2fff;top:45%;left:15%;animation-duration:15s;animation-delay:-4s;}
+@keyframes orbFloat{0%{transform:translate(0,0) scale(1);}50%{transform:translate(25px,-15px) scale(1.04);}100%{transform:translate(-15px,25px) scale(0.96);}}
+.bg-scanline{position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.04) 3px,rgba(0,0,0,0.04) 4px);}
+#particle-canvas{position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.35;}
+.app{position:relative;z-index:1;max-width:920px;margin:0 auto;padding:0 1.5rem 6rem;}
+
+/* HEADER */
+.header{padding:2.5rem 0 2rem;text-align:center;margin-bottom:2.5rem;position:relative;}
+.header-corner{position:absolute;width:36px;height:36px;border-color:var(--cyan);border-style:solid;opacity:0.4;}
+.header-corner.tl{top:2.5rem;left:0;border-width:2px 0 0 2px;}
+.header-corner.tr{top:2.5rem;right:0;border-width:2px 2px 0 0;}
+.header-corner.bl{bottom:1.5rem;left:0;border-width:0 0 2px 2px;}
+.header-corner.br{bottom:1.5rem;right:0;border-width:0 2px 2px 0;}
+.header-badge{display:inline-flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--cyan2);margin-bottom:14px;border:1px solid var(--border2);padding:4px 16px;border-radius:20px;background:var(--cyan4);}
+.badge-dot{width:5px;height:5px;border-radius:50%;background:var(--cyan);animation:pulse 2s infinite;box-shadow:0 0 6px var(--cyan);}
+@keyframes pulse{50%{opacity:0.3;transform:scale(0.8);}}
+.header h1{font-family:'Rajdhani',sans-serif;font-size:clamp(40px,7vw,72px);font-weight:700;letter-spacing:10px;line-height:1;margin-bottom:4px;background:linear-gradient(135deg,#ffffff 0%,#00d4ff 50%,#ffffff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.header-line{width:100%;height:1px;margin-top:1.5rem;background:linear-gradient(90deg,transparent,var(--cyan2),var(--orange),var(--cyan2),transparent);}
+
+/* PANELS */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-bottom:12px;overflow:hidden;transition:border-color 0.3s;}
+.panel:focus-within{border-color:var(--cyan2);}
+.panel-header{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--panel2);border-bottom:1px solid var(--border);}
+.panel-dot{width:8px;height:8px;border-radius:50%;}
+.panel-dot.c{background:var(--cyan);box-shadow:0 0 6px var(--cyan);}
+.panel-dot.o{background:var(--orange);box-shadow:0 0 6px var(--orange);}
+.panel-dot.g{background:var(--gold);box-shadow:0 0 6px var(--gold);}
+.panel-dot.gr{background:var(--green);box-shadow:0 0 6px var(--green);}
+.panel-label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--dim);flex:1;}
+.panel-label span{color:var(--cyan);}
+.panel-stat{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dimmer);}
+.panel-body{padding:1.25rem;}
+
+/* TEXTAREA */
+textarea{width:100%;border:1px solid var(--border);border-radius:6px;padding:14px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#8ab4cc;background:var(--bg2);resize:vertical;outline:none;line-height:1.7;transition:all 0.3s;}
+textarea:focus{border-color:var(--cyan2);background:#050d18;box-shadow:inset 0 0 20px var(--cyan4);color:var(--cyan);}
+textarea::placeholder{color:var(--dimmer);font-size:11px;}
+
+/* COPY BTN */
+.copy-btn{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:2px;padding:4px 12px;background:transparent;color:var(--cyan);border:1px solid var(--cyan2);border-radius:3px;cursor:pointer;transition:all 0.2s;}
+.copy-btn:hover{background:var(--cyan3);}
+.copy-btn.copied{color:var(--green);border-color:var(--green);}
+
+/* PROMPT TEXT */
+.prompt-text{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:1rem 1.25rem;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#6a9ab8;line-height:1.8;white-space:pre-wrap;max-height:280px;overflow-y:auto;user-select:all;}
+
+/* VALIDATE */
+.validate-bar{display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:10px;}
+.v-dot{width:8px;height:8px;border-radius:50%;background:var(--dimmer);flex-shrink:0;transition:all 0.3s;}
+.v-dot.ok{background:var(--green);box-shadow:0 0 6px var(--green);}
+.v-dot.err{background:var(--red);box-shadow:0 0 6px var(--red);}
+.v-msg{color:var(--dim);flex:1;}
+.v-msg.ok{color:var(--green);}
+.v-msg.err{color:var(--red);}
+
+/* COVER LETTER TOGGLE */
+.cl-toggle-panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:1.25rem;margin-bottom:12px;}
+.cl-toggle-row{display:flex;align-items:center;justify-content:space-between;}
+.cl-toggle-left{display:flex;align-items:center;gap:12px;}
+.cl-icon{width:38px;height:38px;border-radius:6px;background:var(--cyan3);border:1px solid var(--cyan2);display:flex;align-items:center;justify-content:center;font-size:18px;}
+.cl-label{font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;color:var(--white);}
+.cl-sub{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:1px;margin-top:2px;}
+.toggle-wrap{position:relative;width:46px;height:25px;}
+.toggle-wrap input{display:none;}
+.toggle-track{position:absolute;inset:0;border-radius:13px;background:var(--dimmer);cursor:pointer;transition:background 0.2s;}
+.toggle-wrap input:checked+.toggle-track{background:var(--cyan);}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:white;transition:left 0.2s;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,0.3);}
+.toggle-wrap input:checked~.toggle-thumb{left:24px;}
+.cl-fields{margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
+.cl-fields-label{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:2px;margin-bottom:10px;}
+.field-row{display:flex;gap:8px;margin-bottom:8px;}
+.field-row>*{flex:1;}
+.field-label{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--dimmer);letter-spacing:1px;margin-bottom:4px;}
+input[type=text]{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:7px 10px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--cyan);outline:none;transition:border-color 0.2s;}
+input[type=text]:focus{border-color:var(--cyan2);}
+
+/* EXEC BUTTON */
+.btn-exec{width:100%;padding:18px;background:transparent;color:var(--cyan);font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:6px;border:1px solid var(--cyan);border-radius:6px;cursor:pointer;position:relative;overflow:hidden;transition:all 0.3s;margin-top:12px;text-transform:uppercase;}
+.btn-exec::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(0,212,255,0.15),transparent);transition:left 0.5s;}
+.btn-exec:hover:not(:disabled)::before{left:100%;}
+.btn-exec:hover:not(:disabled){background:rgba(0,212,255,0.08);box-shadow:var(--glow-c);text-shadow:0 0 10px var(--cyan);}
+.btn-exec:disabled{color:var(--dimmer);border-color:var(--dimmer);cursor:not-allowed;}
+
+/* OUTPUT SECTION */
+.output-section{margin-top:2rem;}
+.out-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:10px;}
+.out-title{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;letter-spacing:4px;background:linear-gradient(90deg,var(--white),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.success-chip{display:flex;align-items:center;gap:6px;padding:5px 14px;border-radius:20px;background:rgba(0,255,136,0.08);border:1px solid var(--green);font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green);letter-spacing:2px;}
+.chip-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite;}
+
+/* TABS */
+.tab-row{display:flex;gap:0;border-bottom:1px solid var(--border2);margin-bottom:1rem;}
+.tab-btn{padding:10px 20px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--dim);background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:all 0.2s;margin-bottom:-1px;}
+.tab-btn.active{color:var(--cyan);border-bottom-color:var(--cyan);text-shadow:0 0 8px var(--cyan);}
+.tab-btn:hover:not(.active){color:var(--white);}
+
+/* PREVIEW SHELL */
+.preview-shell{background:var(--panel);border:1px solid var(--border2);border-radius:8px;padding:2px;box-shadow:var(--glow-c);margin-bottom:12px;}
+.preview-bar{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);}
+.pbar-dot{width:10px;height:10px;border-radius:50%;}
+.pbar-dot.r{background:#ff5f57;}.pbar-dot.y{background:#febc2e;}.pbar-dot.g{background:#28c840;}
+.pbar-title{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);margin:0 auto;letter-spacing:2px;}
+
+/* RESUME PREVIEW */
+.resume-preview{background:#fff;padding:44px 50px;font-family:'Times New Roman',Times,serif;font-size:10.5px;line-height:1.5;color:#000;border-radius:0 0 7px 7px;}
+.r-name{font-size:17px;font-weight:bold;text-align:center;letter-spacing:1.5px;margin-bottom:3px;}
+.r-contact{text-align:center;font-size:9.5px;color:#333;margin-bottom:10px;}
+.r-sec{font-weight:bold;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #000;padding-bottom:2px;margin-top:10px;margin-bottom:5px;}
+.r-para{line-height:1.5;margin-bottom:4px;}
+.r-ul{margin:0;padding-left:16px;}
+.r-ul li{line-height:1.5;margin-bottom:1px;}
+.r-job-hdr{display:flex;justify-content:space-between;margin-top:7px;}
+.r-co{font-weight:bold;}
+.r-date{font-style:italic;}
+.r-sub{display:flex;justify-content:space-between;margin-bottom:3px;}
+.r-title,.r-loc{font-style:italic;}
+.r-edu-row{display:flex;justify-content:space-between;margin-top:4px;}
+.r-edu-co{font-weight:bold;}
+.r-edu-yr{font-style:italic;}
+.r-edu-deg{font-size:10.5px;}
+.page-break-line{border:none;border-top:1px dashed #ccc;margin:12px 0;position:relative;}
+.page-break-line::after{content:'PAGE 2';position:absolute;top:-8px;right:0;font-size:8px;color:#aaa;background:white;padding:0 4px;font-family:Arial,sans-serif;}
+
+/* EDITABLE RESUME TEXTAREA */
+.edit-resume-wrap{background:var(--panel);border:1px solid var(--border2);border-radius:8px;margin-bottom:12px;overflow:hidden;}
+.edit-bar{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--panel2);border-bottom:1px solid var(--border);}
+.edit-badge{font-family:'JetBrains Mono',monospace;font-size:8px;padding:3px 10px;border-radius:2px;background:rgba(255,209,102,0.15);color:var(--gold);border:1px solid var(--gold);letter-spacing:1px;}
+.edit-hint{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);flex:1;}
+.resume-edit-area{width:100%;min-height:320px;background:#fff;padding:32px 36px;font-family:'Times New Roman',Times,serif;font-size:10.5px;line-height:1.6;color:#000;border:none;outline:none;resize:vertical;}
+
+/* COVER LETTER EDIT */
+.cl-edit-wrap{background:var(--panel);border:1px solid var(--border2);border-radius:8px;margin-bottom:12px;overflow:hidden;}
+.cl-fixed{background:#fff;padding:1.25rem 1.75rem;font-family:'Times New Roman',Times,serif;font-size:10.8px;line-height:1.7;color:#000;}
+.cl-fixed .cl-name{font-size:13px;font-weight:bold;margin-bottom:2px;}
+.cl-fixed .cl-contact{font-size:9.5px;color:#444;margin-bottom:8px;font-family:Arial,sans-serif;}
+.cl-fixed .cl-divider{border:none;border-top:0.6px solid #666;margin-bottom:12px;}
+.cl-body-area{width:100%;min-height:220px;background:#fafafa;padding:1.25rem 1.75rem;font-family:'Times New Roman',Times,serif;font-size:10.8px;line-height:1.7;color:#000;border:none;border-top:1px solid #e0e0e0;outline:none;resize:vertical;}
+.cl-closing{background:#fff;padding:0.5rem 1.75rem 1.25rem;font-family:'Times New Roman',Times,serif;font-size:10.8px;line-height:1.7;color:#000;}
+
+/* DOWNLOAD BAR */
+.dl-bar{background:var(--panel2);border:1px solid var(--border2);border-radius:8px;padding:1.25rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;}
+.dl-info-label{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:2px;margin-bottom:3px;}
+.dl-info-name{font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:var(--cyan);letter-spacing:1px;}
+.dl-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.btn-sm{padding:10px 18px;background:transparent;color:var(--dim);border:1px solid var(--border2);border-radius:4px;font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;cursor:pointer;transition:all 0.2s;}
+.btn-sm:hover{color:var(--white);border-color:var(--dimmer);}
+.btn-dl{padding:10px 20px;background:var(--cyan);color:var(--bg);border:none;border-radius:4px;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;letter-spacing:2px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+.btn-dl:hover{background:#33ddff;box-shadow:var(--glow-c);}
+
+.hidden{display:none!important;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+::-webkit-scrollbar-thumb:hover{background:var(--cyan2);}
+</style>
+</head>
+<body>
+<div class="bg-layer">
+  <div class="bg-grid"></div>
+  <div class="bg-orb orb1"></div><div class="bg-orb orb2"></div><div class="bg-orb orb3"></div>
+  <div class="bg-scanline"></div>
+</div>
+<canvas id="particle-canvas"></canvas>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-corner tl"></div><div class="header-corner tr"></div>
+    <div class="header-corner bl"></div><div class="header-corner br"></div>
+    <div class="header-badge"><div class="badge-dot"></div>RESUME ENGINE · ONLINE</div>
+    <h1>ROJAN</h1>
+    <div class="header-line"></div>
+  </div>
+
+  <!-- MASTER PROMPT -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-dot c"></div><div class="panel-dot o"></div><div class="panel-dot g"></div>
+      <div class="panel-label">MASTER PROMPT</div>
+      <button class="copy-btn" id="copy-btn" onclick="copyPrompt()">⎘ COPY</button>
+    </div>
+    <div class="panel-body">
+      <div class="prompt-text" id="prompt-text">You are an elite technical resume writer and career coach who has placed 500+ engineers at FAANG, Fortune 100 financial companies, and top healthcare technology firms. Your resumes score 90%+ on ATS systems AND win callbacks from human recruiters because they sound genuinely human — confident, specific, and compelling.
+
+STEP 1 — ANALYZE THE JOB DESCRIPTION:
+Extract: exact job title, top 5 required technical skills, top 3 soft skills, industry keywords, methodologies, company name, company address, city, state, ZIP code.
+
+STEP 2 — WRITE THE RESUME:
+
+SUMMARY (exactly 2-3 sentences):
+- Open with exact JD job title + years + domain
+- Name 3-4 core strengths matching JD exactly
+- Close with value proposition — what you DELIVER
+- BANNED: results-driven, passionate, team player, hardworking, detail-oriented
+- Never start with "I"
+
+BULLETS (formula: VERB + WHAT + HOW + IMPACT):
+Novel verbs: Led, Architected, Engineered, Spearheaded, Designed, Optimized, Delivered, Built, Implemented, Established
+AmEx verbs: Developed, Architected, Engineered, Integrated, Optimized, Built, Established, Collaborated, Deployed
+USBank verbs: Developed, Designed, Built, Deployed, Optimized, Engineered, Created, Participated
+Freddie verbs: Developed, Built, Supported, Collaborated, Contributed, Implemented
+- Never repeat a verb within the same job
+- Minimum 5 bullets across all jobs must have real numbers: "2M+ daily transactions", "40% latency reduction", "99.9% uptime", "6-engineer team"
+- Mirror EXACT tech spellings from JD: "React.js" not "ReactJS"
+- Sound like a confident senior engineer — human, natural, specific
+
+STEP 3 — WRITE THE COVER LETTER (3 paragraphs, human tone):
+- Paragraph 1: Hook — who you are, why THIS role at THIS company caught your attention, reference the company name naturally
+- Paragraph 2: Proof — 2-3 specific achievements with company names, numbers, technologies. Sound like a person talking, not a robot listing
+- Paragraph 3: Fit + Call to action — genuine enthusiasm for the company/mission, confident close, thank them sincerely
+- TONE: Write exactly as a confident senior engineer would write — conversational yet professional, never stiff or generic
+- NEVER use: "I am writing to express my interest", "I am a highly motivated", "utilize", "leverage", "synergy"
+- Extract company name, address, city, state, ZIP from the JD for the letter header
+
+OUTPUT RULES — NEVER BREAK:
+- Return ONLY a raw valid JSON object — nothing before or after
+- NO markdown, NO backticks, NO explanation
+- Start with { end with } only
+- Use straight double quotes only
+
+EXACT BULLET COUNTS:
+Novel Healthcare Services = exactly 8 bullets
+American Express = exactly 6 bullets
+US Bank = exactly 5 bullets
+Freddie Mac = exactly 4 bullets
+
+FIXED INFO (never change):
+Name: Rojan Shrestha
+Contact: Dallas, TX | 469-293-2076 | rojanstha032@gmail.com
+
+FIXED JOBS (never change company/date/title/location):
+1. Novel Healthcare Services | Jun 2024–Present | Senior Software Developer | Dallas, Texas
+2. American Express | Nov 2021–May 2024 | Senior Software Developer | Phoenix, Arizona
+3. US Bank | Jul 2019–Sep 2021 | Java Full Stack Developer | Dallas, TX
+4. Freddie Mac | May 2017–May 2019 | Jr. Java Developer | McLean, VA
+
+FIXED EDUCATION:
+Texas Woman's University | 2022 | Bachelor of Science, Computer Science
+Dallas College Community College | 2019 | Associate of Science
+Tribhuvan University | 2014 | Bachelor of Business Studies
+
+RETURN THIS EXACT JSON:
+{"summary":"...","skills":[{"label":"Languages","value":"..."},{"label":"Java Technologies","value":"..."},{"label":"Web Services","value":"..."},{"label":"Web Technologies","value":"..."},{"label":"Databases","value":"..."},{"label":"Application Servers","value":"..."},{"label":"Cloud & DevOps","value":"..."},{"label":"Testing","value":"..."},{"label":"Methodologies","value":"..."},{"label":"Operating Systems","value":"..."}],"jobs":[{"company":"Novel Healthcare Services","date":"Jun 2024 – Present","title":"Senior Software Developer","location":"Dallas, Texas","bullets":["b1","b2","b3","b4","b5","b6","b7","b8"]},{"company":"American Express","date":"Nov 2021 – May 2024","title":"Senior Software Developer","location":"Phoenix, Arizona","bullets":["b1","b2","b3","b4","b5","b6"]},{"company":"US Bank","date":"Jul 2019 – Sep 2021","title":"Java Full Stack Developer","location":"Dallas, TX","bullets":["b1","b2","b3","b4","b5"]},{"company":"Freddie Mac","date":"May 2017 – May 2019","title":"Jr. Java Developer","location":"McLean, VA","bullets":["b1","b2","b3","b4"]}],"education":[{"school":"Texas Woman's University","year":"2022","degree":"Bachelor of Science, Computer Science"},{"school":"Dallas College Community College","year":"2019","degree":"Associate of Science"},{"school":"Tribhuvan University","year":"2014","degree":"Bachelor of Business Studies"}],"cover_letter":{"company":"COMPANY_NAME_FROM_JD","address":"STREET_ADDRESS_FROM_JD","city":"CITY_FROM_JD","state":"STATE_FROM_JD","zip":"ZIP_FROM_JD","hiring_manager":"Hiring Manager","job_title":"JOB_TITLE_FROM_JD","date":"TODAYS_DATE","paragraph1":"Hook paragraph — who you are, why this role...","paragraph2":"Proof paragraph — specific achievements with numbers and company names...","paragraph3":"Fit and call to action paragraph — genuine enthusiasm and confident close..."}}
+
+MY CURRENT RESUME:
+[PASTE YOUR FULL RESUME TEXT HERE]
+
+JOB DESCRIPTION:
+[PASTE THE COMPLETE JOB DESCRIPTION HERE]</div>
+    </div>
+  </div>
+
+  <!-- JSON INPUT -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-dot c"></div>
+      <div class="panel-label">OUTPUT</div>
+      <div class="panel-stat" id="json-stat">0 B</div>
+    </div>
+    <div class="panel-body">
+      <textarea id="json-input" rows="10" placeholder="// Paste JSON output from Claude here..." oninput="onJsonInput()"></textarea>
+      <div class="validate-bar">
+        <div class="v-dot" id="v-dot"></div>
+        <div class="v-msg" id="v-msg">Waiting for JSON input...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COVER LETTER TOGGLE -->
+  <div class="cl-toggle-panel">
+    <div class="cl-toggle-row">
+      <div class="cl-toggle-left">
+        <div class="cl-icon">✉</div>
+        <div>
+          <div class="cl-label">GENERATE COVER LETTER?</div>
+          <div class="cl-sub">AI extracts company info from JD · editable before download</div>
+        </div>
+      </div>
+      <label class="toggle-wrap">
+        <input type="checkbox" id="cl-toggle" checked onchange="toggleCL()"/>
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+    </div>
+    <div class="cl-fields" id="cl-fields">
+      <div class="cl-fields-label">COMPANY DETAILS — auto-filled from JD · verify & edit</div>
+      <div class="field-row">
+        <div><div class="field-label">COMPANY NAME</div><input type="text" id="cl-company" placeholder="Auto-filled from JD"/></div>
+        <div><div class="field-label">HIRING MANAGER</div><input type="text" id="cl-manager" value="Hiring Manager"/></div>
+      </div>
+      <div class="field-row">
+        <div><div class="field-label">STREET ADDRESS</div><input type="text" id="cl-address" placeholder="Auto-filled from JD"/></div>
+        <div><div class="field-label">CITY</div><input type="text" id="cl-city" placeholder="City"/></div>
+        <div style="flex:0.5;"><div class="field-label">STATE</div><input type="text" id="cl-state" placeholder="ST"/></div>
+        <div style="flex:0.7;"><div class="field-label">ZIP</div><input type="text" id="cl-zip" placeholder="ZIP"/></div>
+      </div>
+      <div class="field-row">
+        <div><div class="field-label">JOB TITLE (for subject line)</div><input type="text" id="cl-jobtitle" placeholder="Auto-filled from JD"/></div>
+        <div><div class="field-label">DATE</div><input type="text" id="cl-date" placeholder="May 11, 2025"/></div>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-exec" id="btn-format" disabled onclick="formatAll()">
+    ⚡ &nbsp; FORMAT RESUME + COVER LETTER
+  </button>
+
+  <!-- OUTPUT SECTION -->
+  <div class="output-section hidden" id="output-section">
+    <div class="out-header">
+      <div class="out-title">OUTPUT</div>
+      <div class="success-chip"><div class="chip-dot"></div>READY</div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tab-row">
+      <button class="tab-btn active" id="tab-resume" onclick="switchTab('resume')">RESUME</button>
+      <button class="tab-btn" id="tab-cl" onclick="switchTab('cl')">COVER LETTER</button>
+    </div>
+
+    <!-- RESUME TAB -->
+    <div id="pane-resume">
+      <!-- Preview -->
+      <div class="preview-shell">
+        <div class="preview-bar">
+          <div class="pbar-dot r"></div><div class="pbar-dot y"></div><div class="pbar-dot g"></div>
+          <div class="pbar-title">ROJAN_SHRESTHA_RESUME.PDF — PREVIEW</div>
+        </div>
+        <div class="resume-preview" id="resume-preview"></div>
+      </div>
+
+      <!-- Editable resume -->
+      <div class="edit-resume-wrap">
+        <div class="edit-bar">
+          <div class="panel-dot gr"></div>
+          <div class="edit-hint">EDIT BELOW — preview updates live · downloaded PDF reflects your edits</div>
+          <div class="edit-badge">EDITABLE</div>
+        </div>
+        <textarea class="resume-edit-area" id="resume-edit" oninput="syncResumePreview()" spellcheck="true"></textarea>
+        <div style="padding:6px 14px 8px;background:var(--panel2);font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dimmer);border-top:1px solid var(--border);line-height:1.8;">
+          FORMAT GUIDE — keep these tags: ==SUMMARY== ==SKILLS== ==JOB1== ==JOB2== ==JOB3== ==JOB4== ==EDUCATION== &nbsp;·&nbsp; Edit only the text after each | character &nbsp;·&nbsp; One BULLET per line
+        </div>
+      </div>
+    </div>
+
+    <!-- COVER LETTER TAB -->
+    <div id="pane-cl" class="hidden">
+      <div class="cl-edit-wrap">
+        <div class="edit-bar">
+          <div class="panel-dot gr"></div>
+          <div class="edit-hint">EDIT COVER LETTER BELOW — all text is editable</div>
+          <div class="edit-badge">EDITABLE</div>
+        </div>
+        <!-- Fixed header (not editable visually but shown) -->
+        <div class="cl-fixed">
+          <div class="cl-name">Rojan Shrestha</div>
+          <div class="cl-contact">Dallas, TX &nbsp;|&nbsp; 469-293-2076 &nbsp;|&nbsp; rojanstha032@gmail.com</div>
+          <hr class="cl-divider"/>
+          <div id="cl-preview-date" style="margin-bottom:8px;"></div>
+          <div id="cl-preview-recipient" style="margin-bottom:8px;line-height:1.6;"></div>
+          <div id="cl-preview-subject" style="font-weight:bold;margin-bottom:8px;"></div>
+          <div id="cl-preview-salutation"></div>
+        </div>
+        <!-- Editable body -->
+        <textarea class="cl-body-area" id="cl-body-edit" placeholder="Cover letter body paragraphs..."></textarea>
+        <!-- Fixed closing -->
+        <div class="cl-closing">
+          <div>Sincerely,</div>
+          <div style="height:22px;"></div>
+          <div style="font-weight:bold;">Rojan Shrestha</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DOWNLOAD BAR -->
+    <div class="dl-bar">
+      <div>
+        <div class="dl-info-label">OUTPUT FILES</div>
+        <div class="dl-info-name">ROJAN_SHRESTHA_RESUME.PDF</div>
+      </div>
+      <div class="dl-actions">
+        <button class="btn-sm" onclick="reset()">← RESET</button>
+        <button class="btn-sm" onclick="downloadResume()">⬇ RESUME ONLY</button>
+        <button class="btn-dl" onclick="downloadBoth()" id="btn-both">⬇ RESUME + COVER LETTER</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- PARTICLES -->
+<script>
+const C=document.getElementById('particle-canvas');
+const cx=C.getContext('2d');
+C.width=window.innerWidth;C.height=window.innerHeight;
+const pts=Array.from({length:50},()=>({x:Math.random()*C.width,y:Math.random()*C.height,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,r:Math.random()*1.5+.5,o:Math.random()*.4+.15}));
+function draw(){cx.clearRect(0,0,C.width,C.height);pts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;if(p.x<0)p.x=C.width;if(p.x>C.width)p.x=0;if(p.y<0)p.y=C.height;if(p.y>C.height)p.y=0;cx.beginPath();cx.arc(p.x,p.y,p.r,0,Math.PI*2);cx.fillStyle=`rgba(0,212,255,${p.o})`;cx.fill();});pts.forEach((a,i)=>pts.slice(i+1).forEach(b=>{const d=Math.hypot(a.x-b.x,a.y-b.y);if(d<110){cx.beginPath();cx.moveTo(a.x,a.y);cx.lineTo(b.x,b.y);cx.strokeStyle=`rgba(0,212,255,${(1-d/110)*.05})`;cx.lineWidth=.5;cx.stroke();}}));requestAnimationFrame(draw);}
+draw();
+window.addEventListener('resize',()=>{C.width=window.innerWidth;C.height=window.innerHeight;});
+</script>
+
+<script>
+// ── Global data ────────────────────────────────────────────────────────────
+let _d = null;
+
+// ── Copy prompt ────────────────────────────────────────────────────────────
+function copyPrompt(){
+  const text=document.getElementById('prompt-text').innerText;
+  navigator.clipboard.writeText(text).then(()=>{
+    const btn=document.getElementById('copy-btn');
+    btn.textContent='✓ COPIED';btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent='⎘ COPY';btn.classList.remove('copied');},2500);
+  });
+}
+
+// ── Toggle cover letter fields ─────────────────────────────────────────────
+function toggleCL(){
+  const on=document.getElementById('cl-toggle').checked;
+  document.getElementById('cl-fields').style.display=on?'block':'none';
+  const btn=document.getElementById('btn-both');
+  if(btn) btn.style.display=on?'':'none';
+}
+
+// ── JSON validator ─────────────────────────────────────────────────────────
+function onJsonInput(){
+  const raw=document.getElementById('json-input').value.trim();
+  const dot=document.getElementById('v-dot');
+  const msg=document.getElementById('v-msg');
+  const btn=document.getElementById('btn-format');
+  document.getElementById('json-stat').textContent=raw.length.toLocaleString()+' B';
+  if(!raw){dot.className='v-dot';msg.className='v-msg';msg.textContent='Waiting for JSON input...';btn.disabled=true;return;}
+  try{
+    const clean=raw.replace(/```json|```/g,'').trim();
+    const d=JSON.parse(clean);
+    if(!d.summary||!d.skills||!d.jobs||!d.education)throw new Error('Missing required fields');
+    const counts=[8,6,5,4];let warn='';
+    d.jobs.forEach((j,i)=>{if(j.bullets.length!==counts[i])warn+=` ${j.company.split(' ')[0]}:${j.bullets.length}≠${counts[i]}`;});
+    if(warn){dot.className='v-dot err';msg.className='v-msg err';msg.textContent='⚠ Bullet count mismatch:'+warn;btn.disabled=false;}
+    else{dot.className='v-dot ok';msg.className='v-msg ok';msg.textContent='✓ Valid JSON — bullet counts correct — ready!';btn.disabled=false;}
+    // Auto-fill cover letter fields
+    if(d.cover_letter){
+      const cl=d.cover_letter;
+      ['company','address','city','state','zip','hiring_manager','job_title','date'].forEach(k=>{
+        const el=document.getElementById('cl-'+k) || document.getElementById('cl-manager');
+        if(k==='hiring_manager'){const e=document.getElementById('cl-manager');if(e&&cl[k])e.value=cl[k];}
+        else if(k==='job_title'){const e=document.getElementById('cl-jobtitle');if(e&&cl[k])e.value=cl[k];}
+        else{const e=document.getElementById('cl-'+k);if(e&&cl[k])e.value=cl[k];}
+      });
+    }
+  }catch(e){dot.className='v-dot err';msg.className='v-msg err';msg.textContent='✗ Invalid JSON: '+e.message;btn.disabled=true;}
+}
+
+// ── Tab switcher ───────────────────────────────────────────────────────────
+function switchTab(t){
+  document.getElementById('tab-resume').className='tab-btn'+(t==='resume'?' active':'');
+  document.getElementById('tab-cl').className='tab-btn'+(t==='cl'?' active':'');
+  document.getElementById('pane-resume').classList.toggle('hidden',t!=='resume');
+  document.getElementById('pane-cl').classList.toggle('hidden',t!=='cl');
+}
+
+// ── Format everything ──────────────────────────────────────────────────────
+function formatAll(){
+  const raw=document.getElementById('json-input').value.trim();
+  const clean=raw.replace(/```json|```/g,'').trim();
+  _d=JSON.parse(clean);
+  renderResumePreview(_d);
+  populateResumeEdit(_d);
+  if(document.getElementById('cl-toggle').checked) populateCoverLetter(_d);
+  document.getElementById('output-section').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('output-section').scrollIntoView({behavior:'smooth'}),100);
+}
+
+// ── Render resume preview ──────────────────────────────────────────────────
+function renderResumePreview(d){
+  const skills=d.skills.map(s=>`<li><strong>${s.label}</strong> ${s.value}</li>`).join('');
+  const job0=d.jobs[0]?jobHTML(d.jobs[0]):'';
+  const jobs1to3=d.jobs.slice(1).map(jobHTML).join('');
+  const edu=d.education.map(e=>`<div><div class="r-edu-row"><span class="r-edu-co">${e.school}</span><span class="r-edu-yr">${e.year}</span></div><div class="r-edu-deg">${e.degree}</div></div>`).join('');
+  document.getElementById('resume-preview').innerHTML=`
+    <div class="r-name">ROJAN SHRESTHA</div>
+    <div class="r-contact">Dallas, TX &nbsp;|&nbsp; 469-293-2076 &nbsp;|&nbsp; rojanstha032@gmail.com</div>
+    <hr style="border:none;border-top:1.2px solid #000;margin:6px 0 8px 0;"/>
+    <div class="r-sec">Professional Summary</div>
+    <div class="r-para">${d.summary}</div>
+    <div class="r-sec">Technical Skills</div>
+    <ul class="r-ul">${skills}</ul>
+    <div class="r-sec">Professional Experience</div>
+    ${job0}
+    <hr class="page-break-line"/>
+    ${jobs1to3}
+    <div class="r-sec">Education</div>
+    ${edu}`;
+}
+
+function jobHTML(j){
+  return `<div><div class="r-job-hdr"><span class="r-co">${j.company}</span><span class="r-date">${j.date}</span></div><div class="r-sub"><span class="r-title">${j.title}</span><span class="r-loc">${j.location}</span></div><ul class="r-ul">${j.bullets.map(b=>`<li>${b}</li>`).join('')}</ul></div>`;
+}
+
+// ── Build structured text for editing ─────────────────────────────────────
+// Uses a clean structured format that we can parse back reliably
+function populateResumeEdit(d){
+  let txt = '';
+  txt += '==SUMMARY==\n';
+  txt += d.summary + '\n\n';
+
+  txt += '==SKILLS==\n';
+  d.skills.forEach(s => txt += `${s.label}| ${s.value}\n`);
+  txt += '\n';
+
+  d.jobs.forEach((j,i) => {
+    txt += `==JOB${i+1}==\n`;
+    txt += `COMPANY| ${j.company}\n`;
+    txt += `DATE| ${j.date}\n`;
+    txt += `TITLE| ${j.title}\n`;
+    txt += `LOCATION| ${j.location}\n`;
+    j.bullets.forEach((b,bi) => txt += `BULLET${bi+1}| ${b}\n`);
+    txt += '\n';
+  });
+
+  txt += '==EDUCATION==\n';
+  d.education.forEach(e => txt += `${e.school}| ${e.year}| ${e.degree}\n`);
+
+  document.getElementById('resume-edit').value = txt;
+}
+
+// ── Parse edited textarea back into structured data ────────────────────────
+function parseEditedResume(){
+  const raw = document.getElementById('resume-edit').value;
+  const lines = raw.split('\n');
+  const result = {
+    summary:'', skills:[], jobs:[], education:[]
+  };
+
+  let section = '';
+  let curJob = null;
+
+  lines.forEach(line => {
+    const t = line.trim();
+    if(!t) return;
+
+    // Section headers
+    if(t === '==SUMMARY==')  { section='summary'; return; }
+    if(t === '==SKILLS==')   { section='skills';  return; }
+    if(t === '==EDUCATION=='){ section='edu';     return; }
+    const jobMatch = t.match(/^==JOB(\d+)==$/);
+    if(jobMatch){
+      if(curJob) result.jobs.push(curJob);
+      curJob = {company:'',date:'',title:'',location:'',bullets:[]};
+      section='job'; return;
+    }
+
+    if(section === 'summary'){
+      result.summary += (result.summary ? ' ' : '') + t;
+      return;
+    }
+
+    if(section === 'skills'){
+      const idx = t.indexOf('|');
+      if(idx > -1){
+        result.skills.push({label: t.slice(0,idx).trim(), value: t.slice(idx+1).trim()});
+      }
+      return;
+    }
+
+    if(section === 'job' && curJob){
+      if(t.startsWith('COMPANY|'))  { curJob.company  = t.slice(8).trim(); return; }
+      if(t.startsWith('DATE|'))     { curJob.date     = t.slice(5).trim(); return; }
+      if(t.startsWith('TITLE|'))    { curJob.title    = t.slice(6).trim(); return; }
+      if(t.startsWith('LOCATION|')) { curJob.location = t.slice(9).trim(); return; }
+      const bMatch = t.match(/^BULLET\d+\| ?(.+)$/);
+      if(bMatch){ curJob.bullets.push(bMatch[1].trim()); return; }
+      return;
+    }
+
+    if(section === 'edu'){
+      const parts = t.split('|');
+      if(parts.length >= 3){
+        result.education.push({
+          school: parts[0].trim(),
+          year:   parts[1].trim(),
+          degree: parts[2].trim()
+        });
+      }
+      return;
+    }
+  });
+
+  if(curJob) result.jobs.push(curJob);
+  return result;
+}
+
+// ── Sync preview live as user types ───────────────────────────────────────
+function syncResumePreview(){
+  try{
+    const d = parseEditedResume();
+    if(!d.summary && !d.jobs.length) return; // not ready yet
+
+    const skills = d.skills.map(s=>`<li><strong>${s.label}</strong> ${s.value}</li>`).join('');
+    const job0   = d.jobs[0] ? jobHTML(d.jobs[0]) : '';
+    const jobs13 = d.jobs.slice(1).map(jobHTML).join('');
+    const edu    = d.education.map(e=>`
+      <div>
+        <div class="r-edu-row"><span class="r-edu-co">${e.school}</span><span class="r-edu-yr">${e.year}</span></div>
+        <div class="r-edu-deg">${e.degree}</div>
+      </div>`).join('');
+
+    document.getElementById('resume-preview').innerHTML = `
+      <div class="r-name">ROJAN SHRESTHA</div>
+      <div class="r-contact">Dallas, TX &nbsp;|&nbsp; 469-293-2076 &nbsp;|&nbsp; rojanstha032@gmail.com</div>
+      <hr style="border:none;border-top:1.2px solid #000;margin:6px 0 8px 0;"/>
+      <div class="r-sec">Professional Summary</div>
+      <div class="r-para">${d.summary}</div>
+      <div class="r-sec">Technical Skills</div>
+      <ul class="r-ul">${skills}</ul>
+      <div class="r-sec">Professional Experience</div>
+      ${job0}
+      <hr class="page-break-line"/>
+      ${jobs13}
+      <div class="r-sec">Education</div>
+      ${edu}`;
+  }catch(e){
+    // silently ignore parse errors while user is mid-edit
+  }
+}
+
+// ── Populate cover letter ──────────────────────────────────────────────────
+function populateCoverLetter(d){
+  const cl=d.cover_letter||{};
+  const company=document.getElementById('cl-company').value||cl.company||'[Company]';
+  const manager=document.getElementById('cl-manager').value||'Hiring Manager';
+  const address=document.getElementById('cl-address').value||cl.address||'';
+  const city=document.getElementById('cl-city').value||cl.city||'';
+  const state=document.getElementById('cl-state').value||cl.state||'';
+  const zip=document.getElementById('cl-zip').value||cl.zip||'';
+  const jobtitle=document.getElementById('cl-jobtitle').value||cl.job_title||'';
+  const dateVal=document.getElementById('cl-date').value||cl.date||new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+
+  document.getElementById('cl-preview-date').textContent=dateVal;
+  document.getElementById('cl-preview-recipient').innerHTML=`${manager}<br/>${company}<br/>${address}${address?', ':''}${city}${city?', ':''}${state} ${zip}`;
+  document.getElementById('cl-preview-subject').textContent=`Re: ${jobtitle} Position`;
+  document.getElementById('cl-preview-salutation').textContent=`Dear ${manager},`;
+
+  const body=`${cl.paragraph1||''}\n\n${cl.paragraph2||''}\n\n${cl.paragraph3||''}`;
+  document.getElementById('cl-body-edit').value=body.trim();
+}
+
+// ── DOWNLOAD RESUME PDF (hardcoded 2-page, fixed spacing) ─────────────────
+function downloadResume(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'pt',format:'letter',orientation:'portrait'});
+
+  const PW=612,PH=792;
+  const ML=0.58*72; const CW=PW-ML-ML;
+  const MT=36,MB=33;
+  const SZ_NAME=17,SZ_CONTACT=10,SZ_SEC=11,SZ_BODY=10.8;
+  const LH=16.1,SEC_PRE=10,SEC_POST=14,JOB_GAP=4;
+  // FIXED: GAP_AFTER_CONTACT = 22 (more space between contact and summary)
+  const GAP_NAME=13,GAP_CONTACT=22;
+
+  let y=MT+4;
+
+  function forcePage2(){doc.addPage();y=MT+4;}
+  function setF(s,z){doc.setFont('times',s||'normal');doc.setFontSize(z||SZ_BODY);}
+  function split(t,mw,z){setF('normal',z||SZ_BODY);return doc.splitTextToSize(t,mw);}
+  function dn(h){y+=h;}
+
+  function drawSection(title){
+    dn(SEC_PRE);
+    setF('bold',SZ_SEC);doc.text(title.toUpperCase(),ML,y);dn(4);
+    doc.setDrawColor(0,0,0);doc.setLineWidth(0.8);
+    doc.line(ML,y,ML+CW,y);dn(SEC_POST);
+  }
+
+  function drawPara(txt){
+    split(txt,CW).forEach(line=>{setF('normal');doc.text(line,ML,y);dn(LH);});
+  }
+
+  function drawSkill(lbl,val){
+    const label=lbl+'  ';
+    const lw=doc.getStringUnitWidth(label)*SZ_BODY/doc.internal.scaleFactor;
+    setF('bold');const lw2=doc.getTextWidth(label);
+    const vl=split(val,CW-8-lw2);const l1=vl[0]||'';
+    const rest=val.slice(l1.length).trim();
+    const cont=rest?split(rest,CW-8):[];
+    setF('bold');doc.text(label,ML+8,y);
+    setF('normal');doc.text(l1,ML+8+lw2,y);dn(LH);
+    cont.forEach(cl=>{setF('normal');doc.text(cl,ML+8,y);dn(LH);});
+  }
+
+  function drawBullet(txt){
+    split(txt,CW-22).forEach((line,i)=>{
+      setF('normal');
+      if(i===0)doc.text('\u2022',ML+10,y);
+      doc.text(line,ML+21,y);dn(LH);
+    });
+  }
+
+  function drawJob(job){
+    setF('bold');doc.text(job.company,ML,y);
+    setF('italic');doc.text(job.date,ML+CW,y,{align:'right'});dn(LH);
+    setF('italic');doc.text(job.title,ML,y);
+    doc.text(job.location,ML+CW,y,{align:'right'});dn(LH);
+    job.bullets.forEach(b=>drawBullet(b));
+    dn(JOB_GAP);
+  }
+
+  function drawEdu(edu){
+    setF('bold');doc.text(edu.school,ML,y);
+    setF('italic');doc.text(edu.year,ML+CW,y,{align:'right'});dn(LH);
+    setF('italic');doc.text(edu.degree,ML,y);dn(LH+3);
+  }
+
+  // Always use EDITED version from textarea (falls back to _d if parse fails)
+  let d = _d;
+  try{
+    const edited = parseEditedResume();
+    if(edited && edited.summary && edited.jobs.length > 0) d = edited;
+  }catch(e){ /* use original */ }
+
+  doc.setTextColor(0,0,0);
+
+  // Name
+  setF('bold',SZ_NAME);doc.text('ROJAN SHRESTHA',PW/2,y,{align:'center'});dn(GAP_NAME);
+  // Contact
+  setF('normal',SZ_CONTACT);doc.text('Dallas, TX   |   469-293-2076   |   rojanstha032@gmail.com',PW/2,y,{align:'center'});
+  dn(GAP_CONTACT-2);
+  // ── Full-width line under contact (same style as Nitu's) ──
+  doc.setLineWidth(1.2);doc.setDrawColor(0,0,0);
+  doc.line(ML,y,ML+CW,y);
+  dn(10);
+
+  // Summary
+  drawSection('Professional Summary');drawPara(d.summary);
+  // Skills
+  drawSection('Technical Skills');d.skills.forEach(sk=>drawSkill(sk.label+':',sk.value));
+  // Experience header
+  drawSection('Professional Experience');
+  // Novel — ALWAYS PAGE 1
+  if(d.jobs[0])drawJob(d.jobs[0]);
+
+  // ── HARD PAGE BREAK ──
+  forcePage2();
+
+  // AmEx ALWAYS starts page 2
+  if(d.jobs[1])drawJob(d.jobs[1]);
+  if(d.jobs[2])drawJob(d.jobs[2]);
+  if(d.jobs[3])drawJob(d.jobs[3]);
+
+  // Education
+  drawSection('Education');d.education.forEach(e=>drawEdu(e));
+
+  doc.save('Rojan_Shrestha_Resume.pdf');
+}
+
+// ── DOWNLOAD COVER LETTER PDF ──────────────────────────────────────────────
+function downloadCoverLetter(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'pt',format:'letter',orientation:'portrait'});
+
+  const PW=612; const ML=0.85*72; const CW=PW-ML-ML;
+  const MT=0.80*72; const SZ_NAME=14,SZ_CONTACT=10,SZ_BODY=11.5;
+  const LH=17.5,PARA_GAP=14;
+  let y=MT;
+
+  function setF(s,z){doc.setFont('times',s||'normal');doc.setFontSize(z||SZ_BODY);}
+  function dn(h){y+=h;}
+  function drawLine(txt,f,z,align){
+    setF(f,z);
+    if(align==='center')doc.text(txt,PW/2,y,{align:'center'});
+    else if(align==='right')doc.text(txt,ML+CW,y,{align:'right'});
+    else doc.text(txt,ML,y);
+    dn(LH);
+  }
+  function drawPara(txt,gap){
+    doc.setFont('times','normal');doc.setFontSize(SZ_BODY);
+    doc.splitTextToSize(txt,CW).forEach(line=>{doc.text(line,ML,y);dn(LH);});
+    dn(gap||PARA_GAP);
+  }
+
+  doc.setTextColor(0,0,0);
+
+  // Sender
+  setF('bold',SZ_NAME);doc.text('Rojan Shrestha',ML,y);dn(LH-2);
+  setF('normal',SZ_CONTACT);doc.text('Dallas, TX  |  469-293-2076  |  rojanstha032@gmail.com',ML,y);dn(LH-2);
+
+  // Divider
+  dn(6);doc.setLineWidth(0.6);doc.setDrawColor(100,100,100);
+  doc.line(ML,y,ML+CW,y);dn(18);
+
+  // Date
+  const dateVal=document.getElementById('cl-date').value||new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  setF('normal');doc.text(dateVal,ML,y);dn(LH+8);
+
+  // Recipient
+  const manager=document.getElementById('cl-manager').value||'Hiring Manager';
+  const company=document.getElementById('cl-company').value||'';
+  const address=document.getElementById('cl-address').value||'';
+  const city=document.getElementById('cl-city').value||'';
+  const st=document.getElementById('cl-state').value||'';
+  const zip=document.getElementById('cl-zip').value||'';
+  [manager,company,address?`${address}, ${city}, ${st} ${zip}`:``].filter(Boolean).forEach(line=>{
+    setF('normal');doc.text(line,ML,y);dn(LH);
+  });
+  dn(6);
+
+  // Subject
+  const jobtitle=document.getElementById('cl-jobtitle').value||'Software Developer';
+  setF('bold');doc.text(`Re: ${jobtitle} Position`,ML,y);dn(LH+10);
+
+  // Salutation
+  setF('normal');doc.text(`Dear ${manager},`,ML,y);dn(LH+8);
+
+  // Body paragraphs
+  const bodyText=document.getElementById('cl-body-edit').value;
+  const paras=bodyText.split('\n\n').filter(p=>p.trim());
+  paras.forEach((p,i)=>drawPara(p.trim(), i<paras.length-1?PARA_GAP:PARA_GAP+4));
+
+  // Closing
+  setF('normal');doc.text('Sincerely,',ML,y);dn(LH*2.8);
+  setF('bold');doc.text('Rojan Shrestha',ML,y);
+
+  doc.save('Rojan_Shrestha_Cover_Letter.pdf');
+}
+
+// ── Download both ─────────────────────────────────────────────────────────
+function downloadBoth(){
+  downloadResume();
+  setTimeout(()=>downloadCoverLetter(),600);
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────
+function reset(){
+  _d=null;
+  document.getElementById('json-input').value='';
+  document.getElementById('json-stat').textContent='0 B';
+  document.getElementById('v-dot').className='v-dot';
+  document.getElementById('v-msg').className='v-msg';
+  document.getElementById('v-msg').textContent='Waiting for JSON input...';
+  document.getElementById('btn-format').disabled=true;
+  document.getElementById('output-section').classList.add('hidden');
+  ['cl-company','cl-address','cl-city','cl-state','cl-zip','cl-jobtitle','cl-date'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+</script>
+</body>
+</html>
